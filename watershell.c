@@ -67,8 +67,8 @@ int main(int argc, char *argv[])
     unsigned port = PORT;
     int code = 0;
 
-    if (fork())
-        exit(1);
+    //if (fork())
+    //    exit(1);
 
     promisc = PROMISC;
 
@@ -180,7 +180,7 @@ void sigint(int signum){
     //shut it down!
     free(sifreq);
     close(sockfd);
-    exit(1);
+    //exit(1);
 }
 
 //send a reply
