@@ -5,8 +5,8 @@ This will allow you to run commands through iptables or other linux packet filte
 It is essentially a sniffer. It sniffs for udp datagrams to a specified port and then runs a command if a keyword is found
 
 The two keywords right now are run:(command) and status
-- run will run the command that comes after the colon as root
-- status will send a reply packet with the exit code of the last command run
+- run: will run the command that comes after the colon as root
+- status: will send a reply packet with the string "up"
 
 Status will not work if the port is not filtered, block ICMP port unreachable messages somehow and it should reply fine if it really is listening
 
