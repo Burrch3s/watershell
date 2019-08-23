@@ -18,3 +18,14 @@ You can hard code values at the top of watershell.c or you can use command line 
 - DEBUG: verbose logging output to display to the user running the binary
 
 If promiscuous mode is on any traffic that goes over the network that is UDP and matches the spectfied port will trigger the program, for example sending UDP traffic with a payload of run:reboot to 8.8.8.8 will reboot the listening machine if it is on the same network as the originator. This is useful if you don't want to make direct contact with the machine but still want to send it commands. The status reply will have a spoofed source of the destination host you specified.
+
+Compiling
+---------
+Compile by hand or use the Makefile.
+```
+gcc watershell.c -o watershell
+# OR
+make
+# OR
+make watershell
+```
